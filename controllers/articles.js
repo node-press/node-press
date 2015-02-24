@@ -1,21 +1,38 @@
 
 var mongoose  = require('mongoose'),
-    slug      = require('slugg'),
-    Article   = mongoose.model('Article');
+  moment      = require('moment'),
+  Article     = mongoose.model('Article'),
+  passport    = require('passport'),
+  express     = require('express'),
+  auth        = require('./../middlewares/auth');
 
-exports.view = function (req, res) {
+module.exports = (function () {
+  var router = express.Router();
+
+  router.get('/drafts', auth.requireLogin, drafts);
+  router.get('/article/:slug', view);
+  router.get('/article/edit/new', auth.requireLogin, edit);
+  router.get('/article/edit/:slug', auth.requireLogin, edit);
+  router.post('/article/edit', auth.requireLogin, save);
+
+  return router;
+})();
+
+function view(req, res) {
   Article.findOne({slug: req.params.slug}, function (err, article) {
     if (err) {
       throw err;
+    } else if (!article) {
+      throw "Article not found";
     }
 
     res.render('articles/view', {
       article: article
     });
   });
-};
+}
 
-exports.drafts = function (req, res) {
+function drafts(req, res) {
   Article.find({})
     .sort('-createdAt')
     .where('published').ne(true)
@@ -28,37 +45,6 @@ exports.drafts = function (req, res) {
         articles: articles
       });
     });
-};
-
-function slugify(text) {
-  return text.toString().toLowerCase()
-    .replace(/\s+/g, '-')           // replace spaces with -
-    .replace(/[^\w\-]+/g, '')       // remove all non-word chars
-    .replace(/\-\-+/g, '-')         // replace multiple - with single -
-    .replace(/^-+/, '')             // trim - from start of text
-    .replace(/-+$/, '');            // trim - from end of text
-}
-
-function generateSlug(str, done) {
-
-  var baseSlug  =  slug(str),
-      slugz     = baseSlug,
-      count     = 1;
-
-  function checkSlugExists(err, article) {
-    if (err) {
-      throw err;
-    } else if (article) {
-      slugz = baseSlug + "." + count;
-      count += 1;
-
-      Article.findOne({slug: slugz}, checkSlugExists);
-    } else {
-      done(slugz);
-    }
-  }
-
-  Article.findOne({slug: slugz}, checkSlugExists);
 }
 
 function edit(req, res) {
@@ -104,7 +90,11 @@ function save(req, res) {
         article.title = req.body.title;
         article.content = req.body.content;
         article.published = req.body.published;
-
+        if (article.published) {
+          article.publishAt = moment().toDate();
+        } else {
+          article.publishAt = moment(req.body.publishAtDate + "T" +  req.body.publishAtTime).toDate();
+        }
         return article;
       })
       .then(function(article){
@@ -116,31 +106,32 @@ function save(req, res) {
         });
       });
   } else {
-    generateSlug(req.body.title, function (slug) {
-      req.body.slug = slug;
+    req.body.author = {
+      id: req.user._id,
+      username: req.user.username
+    };
 
-      req.body.author = {
-        id: req.user._id,
-        username: req.user.username
-      };
-
-      Article
-        .create(req.body)
-        .then(function(article) {
-          if (!article) {
-            throw "No article found";
+    Article
+      .create(req.body)
+      .then(function(article) {
+        if (!article) {
+          throw "No article found";
+        }
+        return article;
+      })
+      .then(function(article){
+        article.save(function (err) {
+          if (err) {
+            throw err;
           }
-          return article;
-        })
-        .then(function(article){
-          article.save(function (err) {
-            if (err) {
-              throw err;
-            }
-            res.redirect('/article/' + article.slug);
-          });
+
         });
-    });
+        return article;
+      })
+      .then(function(article){
+        // In a .then because we have to wait the end of the save to read the slug.
+        res.redirect('/article/' + article.slug);
+      });
   }
 }
 

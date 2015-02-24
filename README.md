@@ -1,7 +1,9 @@
 node-press
 ==========
 
-A minimalist content management system running on node.js.
+[![Build Status](https://travis-ci.org/node-press/node-press.svg?branch=develop)](https://travis-ci.org/node-press/node-press) [ ![Dependencies](https://david-dm.org/node-press/node-press.svg)](https://david-dm.org/node-press/node-press) [ ![Dev dependencies](https://david-dm.org/node-press/node-press/dev-status.svg)](https://david-dm.org/node-press/node-press#info=devDependencies)
+
+A minimalist content management system running on node.js. See it live at [http://node-press.com](http://node-press.com/).
 
 **Note**: this project is very new, under active development and is not suitable for production apps for the moment. However any feedback will be greatly appreciated.
 
